@@ -1,0 +1,178 @@
+exec_prefix	=	@exec_prefix@
+prefix		=	@prefix@
+bindir		=	@bindir@
+includedir	=	@includedir@
+srcdir		=	@srcdir@
+
+OMX_CONFIGURED	=	@OMX_CONFIGURED@
+
+ifeq ($(OMX_CONFIGURED),1)
+  include @abs_top_srcdir@/common.mk
+endif
+
+CC	=	@CC@
+MKDIR_P	=	@MKDIR_P@
+INSTALL	=	@INSTALL@
+
+COMPONENTS	=
+ifeq (@OMX_BUILD_DRIVER@,1)
+  COMPONENTS	+=	driver
+endif
+ifeq (@OMX_BUILD_LIB@,1)
+  COMPONENTS	+=	lib tools tests man
+  ifeq (@OMX_MX_ABI_COMPAT@,1)
+    COMPONENTS	+=	mxtests
+  endif
+  COMPONENTS	+=	other
+endif
+ifeq (@OMX_PEER_DISCOVERY@,fma)
+  COMPONENTS	+=	fma
+endif
+
+.PHONY: all installonly install clean distclean
+.PHONY: driver driver-installonly driver-install driver-clean driver-distclean
+.PHONY: lib lib-installonly lib-install lib-clean lib-distclean
+.PHONY: tools tools-installonly tools-install tools-clean tools-distclean
+.PHONY: tests tests-installonly tests-install tests-clean tests-distclean
+.PHONY: mxtests mxtests-installonly mxtests-install mxtests-clean mxtests-distclean
+.PHONY: man man-installonly man-install man-clean man-distclean
+.PHONY: other other-installonly other-install other-clean other-distclean
+.PHONY: fma fma-installonly fma-install fma-clean fma-distclean
+
+all: $(COMPONENTS)
+
+installonly: $(patsubst %,%-installonly,$(COMPONENTS))
+
+install: $(patsubst %,%-install,$(COMPONENTS))
+
+clean: $(patsubst %,%-clean,$(COMPONENTS))
+
+distclean: $(patsubst %,%-distclean,$(COMPONENTS))
+
+#################
+# driver targets
+
+driver driver-installonly driver-install driver-clean driver-distclean:
+	$(CMDPREFIX) +$(MAKE) -C driver/linux $(shell echo $@ | cut -s -d- -f2)
+
+##############
+# lib targets
+
+lib lib-installonly lib-install lib-clean lib-distclean:
+	$(CMDPREFIX) +$(MAKE) -C libopen-mx $(shell echo $@ | cut -s -d- -f2)
+
+##########################
+# tools and tests targets
+
+# the lib is required before linking the tools or tests
+tools tests mxtests: lib
+
+tools tools-installonly tools-install tools-clean tools-distclean:
+	$(CMDPREFIX) +$(MAKE) -C tools $(shell echo $@ | cut -s -d- -f2)
+
+tests tests-installonly tests-install tests-clean tests-distclean:
+	$(CMDPREFIX) +$(MAKE) -C tests bindir=$(bindir)/tests $(shell echo $@ | cut -s -d- -f2)
+
+mxtests mxtests-installonly mxtests-install mxtests-clean mxtests-distclean:
+	$(CMDPREFIX) +$(MAKE) -C tests/mx bindir=$(bindir)/tests $(shell echo $@ | cut -s -d- -f2)
+
+#################
+# man targets
+
+man man-installonly man-install man-clean man-distclean:
+	$(CMDPREFIX) +$(MAKE) -C doc/man $(shell echo $@ | cut -s -d- -f2)
+
+#################
+# fma targets
+
+fma fma-installonly fma-install fma-clean fma-distclean:
+	$(CMDPREFIX) +$(MAKE) -C fma $(shell echo $@ | cut -s -d- -f2) "CC=$(CC)" MYRI_INC=-I@abs_top_srcdir@/common/mx MYRI_LIB=@abs_top_builddir@/@OPEN_MX_DEFAULT_LIB_DIR@
+
+################
+# other targets
+
+other other-clean other-distclean:
+
+other-install other-installonly:
+	$(CMDECHO) "  MKDIR   $(DESTDIR)$(includedir)"
+	$(CMDPREFIX) if test ! -d $(DESTDIR)$(includedir); then \
+		$(MKDIR_P) $(DESTDIR)$(includedir) ; \
+	fi
+
+	$(CMDECHO) "  INSTALL $(DESTDIR)$(includedir)/open-mx.h"
+	$(CMDPREFIX) $(INSTALL) -m 0644 $(srcdir)/common/open-mx.h $(DESTDIR)$(includedir)
+
+	$(CMDPREFIX) if test @OMX_MX_ABI_COMPAT@ -eq 1; then \
+		if test x$(mx-trans) = x1 -o x$(mxtrans) = x1 ; then \
+			$(CMDECHOAFTERPREFIX) "  INSTALL $(DESTDIR)$(includedir)/myriexpress.h (translating API)" ; \
+			$(INSTALL) -m 0644 $(srcdir)/common/mx/translate/myriexpress.h $(DESTDIR)$(includedir) ; \
+			$(CMDECHOAFTERPREFIX) "  INSTALL $(DESTDIR)$(includedir)/mx_extensions.h (translating API)" ; \
+			$(INSTALL) -m 0644 $(srcdir)/common/mx/translate/mx_extensions.h $(DESTDIR)$(includedir) ; \
+		else \
+			$(CMDECHOAFTERPREFIX) "  INSTALL $(DESTDIR)$(includedir)/myriexpress.h" ; \
+			$(INSTALL) -m 0644 $(srcdir)/common/mx/myriexpress.h $(DESTDIR)$(includedir) ; \
+			$(CMDECHOAFTERPREFIX) "  INSTALL $(DESTDIR)$(includedir)/mx_extensions.h" ; \
+			$(INSTALL) -m 0644 $(srcdir)/common/mx/mx_extensions.h $(DESTDIR)$(includedir) ; \
+		fi ; \
+		$(CMDECHOAFTERPREFIX) "  INSTALL $(DESTDIR)$(includedir)/mx_raw.h" ; \
+		$(INSTALL) -m 0644 $(srcdir)/common/mx/mx_raw.h $(DESTDIR)$(includedir) ; \
+	fi
+
+##############
+# tags
+
+CTAGS ?= ctags
+ETAGS ?= etags
+
+.PHONY: tags
+
+tags:
+	$(CTAGS) --recurse=yes $(srcdir)
+	$(ETAGS) --recurse=yes $(srcdir)
+
+##############
+# check
+
+.PHONY: check check-base check-loopback check-misc check-vect check-pingpong check-random-loop
+check:
+	OMX_PATH=$$PWD @srcdir@/tools/omx_check.sh.in
+check-base check-loopback check-misc check-vect check-pingpong check-random-loop:
+	OMX_PATH=$$PWD @srcdir@/tools/omx_check.sh.in $(patsubst check-%,%,$@)
+
+##################
+# create tarballs
+
+.PHONY: dist
+
+ifeq ($(OMX_CONFIGURED),1)
+  ifeq ($(SUFFIX),date)
+    TARBALL	=	@PACKAGE_TARNAME@-@PACKAGE_VERSION@+svn.$$(date +%Y%m%d.%H%M%S)
+  else
+    TARBALL	=	@PACKAGE_TARNAME@-@PACKAGE_VERSION@$(SUFFIX)
+  endif
+endif
+
+SVN_URL			=	svn://scm.gforge.inria.fr/svn/open-mx/
+SVN_BRANCH		=	trunk
+GITSVN_BRANCH		=
+PATCHES			=
+ABS_PATCHES		=	$(abspath $(PATCHES))
+
+dist:
+	@if [ -z "$(TARBALL)" ] ; then echo "Cannot create tarball with empty TARBALL name" ; /bin/false ; fi
+	@newdir=$(TARBALL) \
+	 && (if [ -n "$(GITSVN_BRANCH)" ] ; then \
+			echo "Exporting local GIT-SVN branch $(GITSVN_BRANCH)..." ; \
+			git archive --format=tar --prefix=$$newdir/ $(GITSVN_BRANCH) | tar xf - ; \
+		else \
+			echo "Exporting current SVN branch $(SVN_BRANCH)..." ; \
+			svn export $(SVN_URL)/$(SVN_BRANCH) $$newdir ; \
+		fi) \
+	 && (if [ -n "$(ABS_PATCHES)" ] && [ -r "$(ABS_PATCHES)/series" ] ; then echo "Patching the tree with quilt..." ; \
+		cd $$newdir && QUILT_PATCHES=$(ABS_PATCHES) quilt -av push && rm -rf .pc/ ; \
+		fi) \
+	 && echo "Preparing the tree..." \
+	 && cd $$newdir && autoreconf -f && rm -rf autom4te.cache/ && cd .. \
+	 && echo "Creating the tarball..." \
+	 && tar cfz $${newdir}.tar.gz $$newdir && rm -rf $$newdir \
+	 && echo "Created $${newdir}.tar.gz" && ls -l $${newdir}.tar.gz

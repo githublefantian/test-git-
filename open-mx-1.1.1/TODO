@@ -1,0 +1,43 @@
+* try get_user_pages_fast() with 32pages chunks or so
+
+* how to tune mtu/packet-ring-size since 8k-mediums do not always help?
+
+* update all thresholds in non-wire-compat
+  + make them configurable?
+  + merge small/tiny and change the packet type in the driver to TINY
+    only in wire-compat mode?
+
+* make omx_prepare_binding more flexible:
+  + work on a single board, with --append or --clearfile
+  + pass a modulo, or even a hash function
+  + pass a irq-name/pattern
+* add a tool to auto-tune the interface coalescing and binding?
+  + do it within the startup script?
+
+* regcache
+  + disable regcache in omx_rcache_test when the driver feature flag is missing
+* regcache malloc hook (if no driver feature flag)
+* if killed while registering, needed to mark the region as failed?
+* huge page pinning support
+  + add a pagesize in the region segment structure and use either pagesize of hugepagesize when possible
+* if failing to deregister region
+  *** glibc detected *** tests/omx_pingpong: malloc(): memory corruption: 0x000000000064edd0 ***
+
+* group similar fields in structure for cache effects, cache-align some fields?
+  + add a counter per list and group them as well to reduce the progression loop overhead
+
+* add warning about mtu in nic/switches when truncated packet arrives, with printk_rate
+
+=== obsolete ideas
+* why shared memory from/to same send and recv buffer is very bad from 64k+ 128k ?
+* change --iface into ---iface, and use --iface as a "close when no more endpoint"
+* make NEED_SEQNUM a resource and use DELAYED for throttling as well ?
+* what's in src_generation ? unset/unchecked in OMX
+* wire-compat at runtime (8kB frame needs 17bits for medium length)
+* req->recv.specific.medium.frags_received_mask and .accumulated_length are redundant
+  + the mask is needed to detect duplicates, and the length prevents from precomputing the missing mask
+* make shared comms runtime-configurable in the driver
+* use mediumva for shared medium? seems slower
+  + and mediums are not that useful for shared anyway (lower rndv threshold)
+* fix make install -j
+  + just support make -j followed by make install -j, otherwise it's a useless mess
